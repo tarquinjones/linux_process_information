@@ -3,7 +3,7 @@
 #include <string.h>
 #include "../include/process_details.h"
 
-void print_proc_basic_output(procstat_info *procstatInfo);
+void print_proc_basic_output(proc_info *procInfo);
 void print_header_footer(char *title);
 
 /*
@@ -24,8 +24,10 @@ void print_header_footer(char *title)
     printf("\n");
 }
 
-
-void print_proc_basic_output(procstat_info *procstatInfo) {
+/*
+Just temporary for testing
+*/
+void print_proc_basic_output(proc_info *procInfo) {
     print_header_footer("Process Basic Details");
     fprintf(stdout,
     "Process ID: %d\n"
@@ -33,6 +35,7 @@ void print_proc_basic_output(procstat_info *procstatInfo) {
     "Process Group ID: %d\n"
     "Process Name: %s\n"
     "Process Command Line: %s\n"
+    "Process Exe Path: %s\n"
     "Process State: %c\n"
     "Process Start Time: %llu\n"
     "Process Threads: %ld\n"
@@ -40,15 +43,27 @@ void print_proc_basic_output(procstat_info *procstatInfo) {
     "Process Stack Start Pos: 0x%lx\n"
     "Process Env Start Pos: 0x%lx\n"
     "Process Env End Pos: 0x%lx\n",
-    procstatInfo->pid, procstatInfo->ppid, procstatInfo->pgrp,
-    procstatInfo->comm, procstatInfo->cmdline, procstatInfo->state,
-    procstatInfo->starttime, procstatInfo->threads, procstatInfo->vsize,
-    procstatInfo->startstack, procstatInfo->env_start, procstatInfo->env_end
+    procInfo->pid, procInfo->ppid, procInfo->pgrp,
+    procInfo->comm, procInfo->cmdline, procInfo->exe_pth, procInfo->state,
+    procInfo->starttime, procInfo->threads, procInfo->vsize,
+    procInfo->startstack, procInfo->env_start, procInfo->env_end
     );
 }
 
+/*
+Just temporary for testing
+*/
 void print_proc_environ(char *environ)
 {
     print_header_footer("Process Environment");
     fprintf(stdout, "%s", environ);
+}
+
+/*
+Just temporary for testing
+*/
+void print_proc_maps(char *maps)
+{
+    print_header_footer("Process Maps");
+    fprintf(stdout, "%s", maps);
 }

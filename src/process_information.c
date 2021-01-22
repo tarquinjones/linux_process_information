@@ -7,10 +7,11 @@
 Linux process listing
 - User parses in a pid they want detailed information on. (Likely from ps or using the process listing tool)
 - Tool then extracts the following information from /proc
-    - Basic process information similar to process listing tool
-    - Displays the environment variables set for the process
-    - Displays the memory maps for the process
+    - Basic process information similar to process listing tool - DONE
+    - Displays the environment variables set for the process - DONE
+    - Displays the memory maps for the process - DONE
     - Displays the open FDs for the process
+    - Displays the exe path - DONE
 
 */
 

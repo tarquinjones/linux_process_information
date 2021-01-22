@@ -9,7 +9,7 @@ int reg_compare(const char *line, const char *pattern, regmatch_t pmatch[2]);
 char *format_procpth(const char *pid);
 char *format_filepth(const char *base, const char *file);
 char *get_next_line(FILE *fp);
-char *extract_stat_comm(const char *stat_line, procstat_info *procstatInfo);
+char *extract_stat_comm(const char *stat_line, proc_info *procInfo);
 int reg_compare(const char *line, const char *pattern, regmatch_t pmatch[2]);
 //End function declarations
 
@@ -121,7 +121,7 @@ Description: It uses a regex to extract the comm name from the stat line and ret
 
 Return value: char pointer to the new stat new
 */
-char *extract_stat_comm(const char *stat_line, procstat_info *procstatInfo)
+char *extract_stat_comm(const char *stat_line, proc_info *procInfo)
 {
 
     char *new_line = NULL;
@@ -135,14 +135,14 @@ char *extract_stat_comm(const char *stat_line, procstat_info *procstatInfo)
     {
         //First we extract add the comm name to procstatInfo struct
         int comm_size = (reg_matches[0].rm_eo-1)-(reg_matches[0].rm_so+2);
-        procstatInfo->comm = (char *)malloc(comm_size+1);
-        if(procstatInfo->comm == NULL)
+        procInfo->comm = (char *)malloc(comm_size+1);
+        if(procInfo->comm == NULL)
         {
             perror("Error: ");
             return new_line;
         }
-        memcpy(procstatInfo->comm, stat_line+reg_matches[0].rm_so+2, comm_size);
-        procstatInfo->comm[comm_size] = '\0';
+        memcpy(procInfo->comm, stat_line+reg_matches[0].rm_so+2, comm_size);
+        procInfo->comm[comm_size] = '\0';
 
         //Next we create a new stat line without the comm name so we can split on spaces safely!
         new_line = (char *)malloc((strlen(stat_line)+1)-comm_size);

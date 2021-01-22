@@ -20,6 +20,8 @@ Description: This is the main control function that goes out and fetches informa
 int process_details(const char *pid)
 {
     char *environ = NULL;
+    char *maps = NULL;
+
     char *pid_path = format_procpth(pid);
 
     if(check_proc_exists(pid_path) != 1)
@@ -28,45 +30,64 @@ int process_details(const char *pid)
         exit(1);
     }
 
-    int procstat, proccmdline, procenviron = 0;
-    procstat_info *procstatInfo = (procstat_info *)malloc(sizeof(procstat_info));
-    if(procstatInfo == NULL)
+    int procstat, proccmdline, procenviron, procexe, procmaps = 0;
+    proc_info *procInfo = (proc_info *)malloc(sizeof(proc_info));
+    if(procInfo == NULL)
     {
         perror("Error: ");
         exit(1);
     }
 
+    /*
+    TO DO USE BIT FIELDS FOR THIS SO ONE VALUE CAN BE PARSED TO DETERMINE THE OUTPUT
+    */
     //Get proc stat information
-    if(extract_proc_stat(pid_path, procstatInfo) != -1)
+    if(extract_proc_stat(pid_path, procInfo) != -1)
     {
         procstat = 1;
     }
 
-    //Get cmdline information
-    if(extract_proc_cmdline(pid_path, procstatInfo) != -1) {
+    if(extract_proc_cmdline(pid_path, procInfo) != -1) {
         proccmdline = 1;
     }
 
+    if(get_proc_exe(pid_path, procInfo) != -1)
+    {
+        procexe = 1;
+    }
 
     if(extract_proc_environ(pid_path, &environ) != -1) {
         procenviron = 1;
     }
 
+    if(get_proc_maps(pid_path, &maps) != -1) {
+        procmaps = 1;
+    }
+
     /*
     Output is determined on what we were able to fetch
     */
-    print_proc_basic_output(procstatInfo);
+    print_proc_basic_output(procInfo);
 
     if(procstat == 1)
-        free(procstatInfo->comm);
+        free(procInfo->comm);
+
     if(proccmdline == 1)
-        free(procstatInfo->cmdline);
-    free(procstatInfo);
+        free(procInfo->cmdline);
+    free(procInfo);
+
     if(procenviron == 1)
     {
         print_proc_environ(environ);
         free(environ);
     }
+
+    if(procmaps == 1)
+    {
+        print_proc_maps(maps);
+        free(maps);
+    }
+
 
     free(pid_path);
     return 0;
@@ -95,7 +116,7 @@ Function Name: extract_proc_cmdline
 Description: Reads from /proc/pid/cmdline to get cmdline of specfied pid
 Return Value: -1 if error or 1 on success
 */
-int extract_proc_cmdline(const char *proc_path, procstat_info *procstatInfo)
+int extract_proc_cmdline(const char *proc_path, proc_info *procInfo)
 {
     char *cmdlinepth = format_filepth(proc_path, "cmdline");
     int ret_value = -1;
@@ -105,7 +126,7 @@ int extract_proc_cmdline(const char *proc_path, procstat_info *procstatInfo)
     char *cmdline_line = get_next_line(cmdlinefp, 0);
     if(cmdline_line != NULL)
     {
-        procstatInfo->cmdline = cmdline_line;
+        procInfo->cmdline = cmdline_line;
         ret_value = 1;
     }
 
@@ -120,7 +141,7 @@ Description: Uses the /proc/pid/stat file to parse out information into the proc
     - This is done to mitigate any errors caused by splitting on space.
 Return Value: -1 if error or 1 on success
 */
-int extract_proc_stat(const char *proc_path, procstat_info *procstatInfo)
+int extract_proc_stat(const char *proc_path, proc_info *procInfo)
 {
     char *statpth = format_filepth(proc_path, "stat");
     int ret_value = -1;
@@ -129,7 +150,7 @@ int extract_proc_stat(const char *proc_path, procstat_info *procstatInfo)
 
     char *stat_line = get_next_line(statfp, 0);
 
-    char *mod_stat_line = extract_stat_comm(stat_line, procstatInfo);
+    char *mod_stat_line = extract_stat_comm(stat_line, procInfo);
 
     if(mod_stat_line == NULL)
     {
@@ -138,10 +159,10 @@ int extract_proc_stat(const char *proc_path, procstat_info *procstatInfo)
     }
 
     if(sscanf(mod_stat_line, PROCSTAT_FMTSTR,
-    &procstatInfo->pid, &procstatInfo->state, &procstatInfo->ppid,
-    &procstatInfo->pgrp, &procstatInfo->threads, &procstatInfo->starttime,
-    &procstatInfo->vsize, &procstatInfo->startstack, &procstatInfo->env_start,
-    &procstatInfo->env_end
+    &procInfo->pid, &procInfo->state, &procInfo->ppid,
+    &procInfo->pgrp, &procInfo->threads, &procInfo->starttime,
+    &procInfo->vsize, &procInfo->startstack, &procInfo->env_start,
+    &procInfo->env_end
     ) != EOF) {
         ret_value = 1;
     }
@@ -210,5 +231,55 @@ int extract_proc_environ(const char *proc_path, char **environ)
 
 }
 
+int get_proc_exe(const char *proc_path, proc_info *procInfo)
+{
+    char *exepth = format_filepth(proc_path, "exe");
+    readlink(exepth, procInfo->exe_pth, PATH_MAX);
+    return 1;
+}
 
+int get_proc_maps(const char *proc_path, char **maps)
+{
+    char c;
+    FILE *mapsfp;
+    int ch_count = 0;
+    int ret_val = -1;
 
+    char *mapspth = format_filepth(proc_path, "maps");
+    mapsfp = fopen(mapspth, "r");
+    if(mapsfp == NULL)
+    {
+        perror("Proc Maps");
+        exit(1);
+    }
+
+    while((c = fgetc(mapsfp)) != EOF)
+    {
+        if(ch_count == 0)
+        {
+            ch_count = 2;
+            *maps = (char *)malloc(ch_count);
+            if(*maps == NULL)
+            {
+                perror("Error:");
+                ret_val = -1;
+            }
+        }
+        else
+        {
+            ch_count++;
+            char *tmp = (char *)realloc(*maps, ch_count);
+            if(tmp == NULL) {
+                perror("Error: ");
+                ret_val = -1;
+                break;
+            }
+            *maps = tmp;
+        }
+        *(*maps+ch_count-2) = c;
+        *(*maps+ch_count-1) = '\0';
+        ret_val = 1;
+    }
+
+    return ret_val;
+}
