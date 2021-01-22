@@ -56,7 +56,6 @@ int process_details(const char *pid)
     Output is determined on what we were able to fetch
     */
     print_proc_basic_output(procstatInfo);
-    print_proc_environ(environ);
 
     if(procstat == 1)
         free(procstatInfo->comm);
@@ -64,7 +63,10 @@ int process_details(const char *pid)
         free(procstatInfo->cmdline);
     free(procstatInfo);
     if(procenviron == 1)
+    {
+        print_proc_environ(environ);
         free(environ);
+    }
 
     free(pid_path);
     return 0;
@@ -170,7 +172,7 @@ int extract_proc_environ(const char *proc_path, char **environ)
 
     if(environfp == NULL)
     {
-        perror("Error: ");
+        perror("Proc Environ");
         return ret_val;
     }
     while((c = fgetc(environfp)) != EOF) {
