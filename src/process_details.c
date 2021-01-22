@@ -200,9 +200,9 @@ int extract_proc_environ(const char *proc_path, char **environ)
         *(*environ+ch_count-2) = c;
         *(*environ+ch_count-1) = '\0';
         ret_val = 1;
-        //printf("%s\n", environ);
     }
 
+    fclose(environfp);
     free(environ_pth);
     return ret_val;
 
