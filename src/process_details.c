@@ -8,6 +8,7 @@
 #include "../include/output_handler.h"
 
 int process_details(const char *pid);
+void free_fd_list(fd_node_t **head);
 int check_proc_exists(const char *pid_path);
 int extract_proc_cmdline(const char *proc_path, proc_info *procInfo);
 int extract_proc_stat(const char *proc_path, proc_info *procInfo);
@@ -105,9 +106,26 @@ int process_details(const char *pid)
 
     printf("\n");
     free(pid_path);
+
+    free_fd_list(&fds_head);
     return 0;
 }
 
+/*
+Function: free_fd_list
+Description: Free that linked list we made to store the FD information
+Return value: (void)
+*/
+void free_fd_list(fd_node_t **head)
+{
+    fd_node_t *tmp;
+    while(*head != NULL)
+    {
+        tmp = (*head)->next;
+        free(*head);
+        (*head) = tmp;
+    }
+}
 
 /*
 Function: check_proc_exists
