@@ -2,13 +2,20 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <string.h>
+#include <limits.h>
 #include "../include/process_details.h"
 #include "../include/string_handler.h"
 #include "../include/output_handler.h"
 
 int process_details(const char *pid);
 int check_proc_exists(const char *pid_path);
-int extract_proc_environ(const char *proc_path, char **environ);
+int extract_proc_cmdline(const char *proc_path, proc_info *procInfo);
+int extract_proc_stat(const char *proc_path, proc_info *procInfo);
+char *extract_proc_environ(const char *proc_path);
+int get_proc_exe(const char *proc_path, proc_info *procInfo);
+char *get_proc_maps(const char *proc_path);
+void push_fd_node(fd_node_t **head, char *value, char *fd_name);
+fd_node_t *get_proc_fds(const char *proc_path);
 
 /*
 Function: process_details
@@ -19,8 +26,7 @@ Description: This is the main control function that goes out and fetches informa
 */
 int process_details(const char *pid)
 {
-    char *environ = NULL;
-    char *maps = NULL;
+    char *environ = NULL, *maps = NULL;
 
     char *pid_path = format_procpth(pid);
 
@@ -31,6 +37,10 @@ int process_details(const char *pid)
     }
 
     int procstat, proccmdline, procenviron, procexe, procmaps = 0;
+
+    //INIT Structure to store FDs
+    fd_node_t *fds_head;
+
     proc_info *procInfo = (proc_info *)malloc(sizeof(proc_info));
     if(procInfo == NULL)
     {
@@ -56,18 +66,18 @@ int process_details(const char *pid)
         procexe = 1;
     }
 
-    if(extract_proc_environ(pid_path, &environ) != -1) {
-        procenviron = 1;
-    }
+    //fds_head = get_proc_fds(pid_path);
 
-    if(get_proc_maps(pid_path, &maps) != -1) {
-        procmaps = 1;
-    }
+    environ = extract_proc_environ(pid_path);
+    maps = get_proc_maps(pid_path);
+
+    fds_head = get_proc_fds(pid_path);
 
     /*
     Output is determined on what we were able to fetch
     */
     print_proc_basic_output(procInfo);
+
 
     if(procstat == 1)
         free(procInfo->comm);
@@ -76,19 +86,24 @@ int process_details(const char *pid)
         free(procInfo->cmdline);
     free(procInfo);
 
-    if(procenviron == 1)
+    if(environ != NULL)
     {
         print_proc_environ(environ);
         free(environ);
     }
 
-    if(procmaps == 1)
+    if(maps != NULL)
     {
         print_proc_maps(maps);
         free(maps);
     }
 
+    if(fds_head != NULL)
+    {
+        print_proc_fds(fds_head);
+    }
 
+    printf("\n");
     free(pid_path);
     return 0;
 }
@@ -180,106 +195,184 @@ Description: Extracts the information stored in /proc/pid/environ
 - This function is permission dependant so you'll only get this information applicable to a process started by the user/group you are in
 */
 
-int extract_proc_environ(const char *proc_path, char **environ)
+char *extract_proc_environ(const char *proc_path)
 {
 
-    int ret_val = -1;
     int c;
     int ch_count = 0;
     FILE *environfp;
 
     char *environ_pth = format_filepth(proc_path, "environ");
     environfp = fopen(environ_pth,"r");
-
+    char *environ = NULL;
     if(environfp == NULL)
-    {
-        perror("Proc Environ");
-        return ret_val;
-    }
+        goto exit;
     while((c = fgetc(environfp)) != EOF) {
         if(ch_count == 0) {
             ch_count = 2;
-            *environ = (char *)malloc(ch_count);
-            if(*environ == NULL) {
-                perror("Error: ");
-                ret_val = -1;
-                break;
+            environ = (char *)malloc(ch_count);
+            if(environ == NULL) {
+                perror("Malloc Error: ");
+                exit(-1);
             }
         } else {
             ch_count++;
-            char *tmp = (char *)realloc(*environ, ch_count);
+            char *tmp = (char *)realloc(environ, ch_count);
             if(tmp == NULL) {
-                perror("Error: ");
-                ret_val = -1;
-                break;
+                perror("Realloc Error: ");
+                exit(-1);
             }
-            *environ = tmp;
+            environ = tmp;
         }
 
         if(c == '\0') {
             c = '\n';
         }
 
-        *(*environ+ch_count-2) = c;
-        *(*environ+ch_count-1) = '\0';
-        ret_val = 1;
+        environ[ch_count-2] = c;
+        environ[ch_count-1] = '\0';
     }
 
     fclose(environfp);
     free(environ_pth);
-    return ret_val;
-
+    return environ;
+exit:
+    return environ;
 }
 
+/*
+Function get_proc_exe
+Description: Gets the path of the exe associated with the process
+Return value: 1 on success or -1 on failure;
+*/
 int get_proc_exe(const char *proc_path, proc_info *procInfo)
 {
+    int ret_val = -1;
     char *exepth = format_filepth(proc_path, "exe");
-    readlink(exepth, procInfo->exe_pth, PATH_MAX);
-    return 1;
+
+    if(readlink(exepth, procInfo->exe_pth, PATH_MAX) > 0)
+        ret_val = 1;
+
+    return ret_val;
 }
 
-int get_proc_maps(const char *proc_path, char **maps)
+/*
+Function: get_proc_maps
+Description: Uses the maps file to print all the process memory map
+Return value: 1 on success or -1 on failure
+*/
+char *get_proc_maps(const char *proc_path)
 {
     char c;
     FILE *mapsfp;
     int ch_count = 0;
-    int ret_val = -1;
+    char *maps = NULL;
 
     char *mapspth = format_filepth(proc_path, "maps");
     mapsfp = fopen(mapspth, "r");
     if(mapsfp == NULL)
-    {
-        perror("Proc Maps");
-        exit(1);
-    }
+        goto exit;
 
     while((c = fgetc(mapsfp)) != EOF)
     {
         if(ch_count == 0)
         {
             ch_count = 2;
-            *maps = (char *)malloc(ch_count);
-            if(*maps == NULL)
+            maps = (char *)malloc(ch_count);
+            if(maps == NULL)
             {
-                perror("Error:");
-                ret_val = -1;
+                perror("Malloc Error:");
+                exit(-1);
             }
         }
         else
         {
             ch_count++;
-            char *tmp = (char *)realloc(*maps, ch_count);
+            char *tmp = (char *)realloc(maps, ch_count);
             if(tmp == NULL) {
-                perror("Error: ");
-                ret_val = -1;
+                perror("Realloc Error: ");
                 break;
             }
-            *maps = tmp;
+            maps = tmp;
         }
-        *(*maps+ch_count-2) = c;
-        *(*maps+ch_count-1) = '\0';
-        ret_val = 1;
+
+        maps[ch_count-2] = c;
+        maps[ch_count-1] = '\0';
     }
 
-    return ret_val;
+exit:
+    return maps;
+}
+
+
+/*
+Function: push_fd_node
+Description: Adds node to the end of the FD linked list
+Return value: (void)
+*/
+void push_fd_node(fd_node_t **head, char *value, char *fd_name)
+{
+    fd_node_t *new_node = (fd_node_t*)malloc(sizeof(fd_node_t));
+    if(new_node == NULL)
+    {
+        perror("Malloc error:");
+        exit(1);
+    }
+
+    if(memcpy(new_node->path, value, strlen(value)+1) == NULL)
+    {
+        perror("Issue during memcpy...");
+        exit(1);
+    }
+    new_node->fd_name = strdup(fd_name);
+
+    new_node->next = NULL;
+
+    if(*head == NULL) {
+        *head = new_node;
+    } else {
+        fd_node_t *last_node = *head;
+
+        while(last_node->next != NULL) {
+            last_node = last_node->next;
+        }
+
+        last_node->next = new_node;
+    }
+}
+
+/*
+Function: get_proc_fds
+Description: Retrieves all FDs (including deleted) for the specified process
+    - It stores the results in a linked list for later processing.
+Return value: fd_node_t
+*/
+fd_node_t *get_proc_fds(const char *proc_path)
+{
+    DIR *fd_dir;
+    struct dirent *fd_dirent;
+    int ret_val = -1;
+    char link_path[PATH_MAX];
+    char *fdpth = format_filepth(proc_path, "fd/");
+    char *temp_fdpth;
+
+    fd_node_t *head;
+
+    fd_dir = opendir(fdpth);
+    if(fd_dir != NULL)
+    {
+        while((fd_dirent = readdir(fd_dir)) != NULL) {
+            if(fd_dirent->d_type == DT_LNK) {
+                temp_fdpth = format_filepth(fdpth, fd_dirent->d_name);
+                ssize_t link_size = readlink (temp_fdpth, link_path, PATH_MAX);
+                if(link_size > 0) {
+                    //As readlink doesn't add the '\0' termninator we do it's work for it
+                    link_path[link_size] = '\0';
+                    push_fd_node(&head, link_path, fd_dirent->d_name);
+                }
+                free(temp_fdpth);
+            }
+        }
+    }
+    return head;
 }

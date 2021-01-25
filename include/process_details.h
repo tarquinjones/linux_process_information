@@ -19,5 +19,12 @@ typedef struct proc_info {
     size_t env_end;
 } proc_info;
 
+typedef struct FD_node
+{
+    char path[PATH_MAX];
+    char *fd_name;
+    struct FD_node *next;
+} fd_node_t;
+
 int process_details(const char *pid);
 int extract_proc_stat(const char *proc_path, proc_info *procInfo);

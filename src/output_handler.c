@@ -4,7 +4,8 @@
 #include "../include/process_details.h"
 
 void print_proc_basic_output(proc_info *procInfo);
-void print_header_footer(char *title);
+void print_header(char *title);
+void print_proc_fds(fd_node_t *head);
 
 /*
 Function: print_header_footer
@@ -12,7 +13,7 @@ Description: Prints either the header or the footer dependant on type provided.
 - Type 1: Prints block header
 - Type 2: Prints block footer
 */
-void print_header_footer(char *title)
+void print_header(char *title)
 {
     printf("\n");
     for(int i = 0; i < 40; i++)
@@ -28,7 +29,7 @@ void print_header_footer(char *title)
 Just temporary for testing
 */
 void print_proc_basic_output(proc_info *procInfo) {
-    print_header_footer("Process Basic Details");
+    print_header("Process Basic Details");
     fprintf(stdout,
     "Process ID: %d\n"
     "Process Parent ID: %d\n"
@@ -55,7 +56,7 @@ Just temporary for testing
 */
 void print_proc_environ(char *environ)
 {
-    print_header_footer("Process Environment");
+    print_header("Process Environment");
     fprintf(stdout, "%s", environ);
 }
 
@@ -64,6 +65,17 @@ Just temporary for testing
 */
 void print_proc_maps(char *maps)
 {
-    print_header_footer("Process Maps");
+    print_header("Process Maps");
     fprintf(stdout, "%s", maps);
+}
+
+void print_proc_fds(fd_node_t *head)
+{
+    print_header("Process File Descriptors");
+    fd_node_t *temp;
+    temp = head;
+    while(temp != NULL) {
+        printf("FD %s --> %s\n", temp->fd_name, temp->path);
+        temp = temp->next;
+    }
 }

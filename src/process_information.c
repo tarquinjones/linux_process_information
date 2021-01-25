@@ -10,9 +10,11 @@ Linux process listing
     - Basic process information similar to process listing tool - DONE
     - Displays the environment variables set for the process - DONE
     - Displays the memory maps for the process - DONE
-    - Displays the open FDs for the process
+    - Displays the open FDs for the process - DONE
     - Displays the exe path - DONE
-
+    - Convert process start time - TO DO
+    - Handle NULL exe path - TO DO
+    - Use bit fields to reduce memory for determining result success - TO DO
 */
 
 void usage()
