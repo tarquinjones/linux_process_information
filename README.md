@@ -14,6 +14,13 @@ Note that not all of this information will be available as low privilege user.
 
 ## Usage
 
+First you need to compile it...
+```bash
+git clone [this repo]
+cd linux_process_information
+make
+```
+
 You have a few options when using the tool
 ```bash
 ./proc_info -h
