@@ -30,7 +30,7 @@ You have to provide a valid PID and at least one option. If you want everything 
 ## Examples
 
 Basic mode
-'''
+```bash
 ./proc_info -p 59428 -b
 
 -------------------- Process Basic Details --------------------
@@ -47,10 +47,10 @@ Process Memory Size: 3338240 bytes
 Process Stack Start Pos: 0x7ffe65a9ccf0
 Process Env Start Pos: 0x7ffe65a9e42f
 Process Env End Pos: 0x7ffe65a9efec
-'''
+```
 
 Environment mode
-'''
+```bash
 ./proc_info -p 59428 -e
 SHELL=/bin/bash
 SESSION_MANAGER=local/ubuntu:@/tmp/.ICE-unix/1951,unix/ubuntu:/tmp/.ICE-unix/1951
@@ -61,20 +61,20 @@ XDG_MENU_PREFIX=gnome-
 GNOME_DESKTOP_SESSION_ID=this-is-deprecated
 GNOME_SHELL_SESSION_MODE=ubuntu
 ...
-'''
+```
 
 File Descriptor Mode
-'''
+```bash
 ./proc_info -p 59428 -f
 -------------------- Process File Descriptors --------------------
 FD 0 --> /etc/passwd
 FD 1 --> /dev/pts/5
 FD 2 --> /dev/pts/5
 FD 3 --> socket:[431308]
-'''
+```
 
 Memory maps mode
-'''
+```bash
 ./proc_info -p 59428 -m
 -------------------- Process Maps --------------------
 55e88e9d6000-55e88e9d8000 r--p 00000000 08:05 4588318                    /usr/bin/nc.openbsd
@@ -86,5 +86,5 @@ Memory maps mode
 55e88fdc2000-55e88fde3000 rw-p 00000000 00:00 0                          [heap]
 7f21f0176000-7f21f0179000 rw-p 00000000 00:00 0 
 ...
-'''
+```
 
