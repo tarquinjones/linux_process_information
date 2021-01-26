@@ -26,5 +26,5 @@ typedef struct FD_node
     struct FD_node *next;
 } fd_node_t;
 
-int process_details(const char *pid);
+int process_details(const char *pid, u_int8_t options);
 int extract_proc_stat(const char *proc_path, proc_info *procInfo);

@@ -3,11 +3,14 @@
 #include <dirent.h>
 #include <string.h>
 #include <limits.h>
+#include <unistd.h>
 #include "../include/process_details.h"
+#include "../include/process_information.h"
 #include "../include/string_handler.h"
 #include "../include/output_handler.h"
 
-int process_details(const char *pid);
+ssize_t get_btime();
+int process_details(const char *pid, u_int8_t options);
 void free_fd_list(fd_node_t **head);
 int check_proc_exists(const char *pid_path);
 int extract_proc_cmdline(const char *proc_path, proc_info *procInfo);
@@ -18,6 +21,31 @@ char *get_proc_maps(const char *proc_path);
 void push_fd_node(fd_node_t **head, char *value, char *fd_name);
 fd_node_t *get_proc_fds(const char *proc_path);
 
+ssize_t get_btime()
+{
+    char *fpath = format_filepth(PROC_PTH, "stat");
+    FILE *fp;
+    char *line;
+    ssize_t btime;
+
+    fp = fopen(fpath, "r");
+    if(fp == NULL)
+    {
+        perror("Error:");
+        exit(-1);
+    }
+
+    //Get each line until we match on btime
+    while( (line = get_next_line(fp)) != NULL) {
+        if( strncmp(line, "btime", 5) == 0 )
+        {
+            sscanf(line, "%*s %lu", &btime);
+        }
+        free(line);
+    }
+    return btime;
+}
+
 /*
 Function: process_details
 Description: This is the main control function that goes out and fetches information from other functions within this file
@@ -25,10 +53,11 @@ Description: This is the main control function that goes out and fetches informa
     - This isn't a conclusive check as it may disappear by the time we start then attempting to parse out the information for the pid.
 - Also worth noting that we may get half way through collecting the information and the proc disappears so we need to handle this...
 */
-int process_details(const char *pid)
+int process_details(const char *pid, u_int8_t options)
 {
     char *environ = NULL, *maps = NULL;
-
+    //Need this to determine process start time
+    ssize_t boot_time = get_btime();
     char *pid_path = format_procpth(pid);
 
     if(check_proc_exists(pid_path) != 1)
@@ -37,10 +66,10 @@ int process_details(const char *pid)
         exit(1);
     }
 
-    int procstat, proccmdline, procenviron, procexe, procmaps = 0;
+    int procstat = 0, proccmdline = 0;
 
     //INIT Structure to store FDs
-    fd_node_t *fds_head;
+    fd_node_t *fds_head = NULL;
 
     proc_info *procInfo = (proc_info *)malloc(sizeof(proc_info));
     if(procInfo == NULL)
@@ -49,42 +78,34 @@ int process_details(const char *pid)
         exit(1);
     }
 
-    /*
-    TO DO USE BIT FIELDS FOR THIS SO ONE VALUE CAN BE PARSED TO DETERMINE THE OUTPUT
-    */
-    //Get proc stat information
-    if(extract_proc_stat(pid_path, procInfo) != -1)
-    {
-        procstat = 1;
+    if(options & BASIC) {
+        procstat = extract_proc_stat(pid_path, procInfo);
+        //Convert the start time
+        procInfo->starttime = boot_time+(procInfo->starttime/sysconf(_SC_CLK_TCK));
+        proccmdline = extract_proc_cmdline(pid_path, procInfo);
+        if( get_proc_exe(pid_path, procInfo) == -1) {
+            memcpy(procInfo->exe_pth, "(PERMISSION DENIED)",strlen("(PERMISSION DENIED)"));
+            procInfo->exe_pth[strlen("(PERMISSION DENIED)")] = '\0';
+        }
     }
-
-    if(extract_proc_cmdline(pid_path, procInfo) != -1) {
-        proccmdline = 1;
-    }
-
-    if(get_proc_exe(pid_path, procInfo) != -1)
-    {
-        procexe = 1;
-    }
-
-    //fds_head = get_proc_fds(pid_path);
-
-    environ = extract_proc_environ(pid_path);
-    maps = get_proc_maps(pid_path);
-
-    fds_head = get_proc_fds(pid_path);
+    if(options & ENVIRON)
+        environ = extract_proc_environ(pid_path);
+    if(options & MAPS)
+        maps = get_proc_maps(pid_path);
+    if(options & FDS)
+        fds_head = get_proc_fds(pid_path);
 
     /*
-    Output is determined on what we were able to fetch
+    - Handling the output based on options and then freeing stuff...
     */
-    print_proc_basic_output(procInfo);
-
-
-    if(procstat == 1)
+    if(procstat == 1) {
+        print_proc_basic_output(procInfo);
         free(procInfo->comm);
+    }
 
     if(proccmdline == 1)
         free(procInfo->cmdline);
+
     free(procInfo);
 
     if(environ != NULL)
@@ -102,12 +123,11 @@ int process_details(const char *pid)
     if(fds_head != NULL)
     {
         print_proc_fds(fds_head);
+        free_fd_list(&fds_head);
     }
 
     printf("\n");
     free(pid_path);
-
-    free_fd_list(&fds_head);
     return 0;
 }
 
@@ -156,7 +176,7 @@ int extract_proc_cmdline(const char *proc_path, proc_info *procInfo)
     FILE *cmdlinefp;
     cmdlinefp = fopen(cmdlinepth,"r");
 
-    char *cmdline_line = get_next_line(cmdlinefp, 0);
+    char *cmdline_line = get_next_line(cmdlinefp);
     if(cmdline_line != NULL)
     {
         procInfo->cmdline = cmdline_line;
@@ -181,7 +201,7 @@ int extract_proc_stat(const char *proc_path, proc_info *procInfo)
     FILE *statfp;
     statfp = fopen(statpth,"r");
 
-    char *stat_line = get_next_line(statfp, 0);
+    char *stat_line = get_next_line(statfp);
 
     char *mod_stat_line = extract_stat_comm(stat_line, procInfo);
 
@@ -369,12 +389,11 @@ fd_node_t *get_proc_fds(const char *proc_path)
 {
     DIR *fd_dir;
     struct dirent *fd_dirent;
-    int ret_val = -1;
     char link_path[PATH_MAX];
     char *fdpth = format_filepth(proc_path, "fd/");
     char *temp_fdpth;
 
-    fd_node_t *head;
+    fd_node_t *head = NULL;
 
     fd_dir = opendir(fdpth);
     if(fd_dir != NULL)
