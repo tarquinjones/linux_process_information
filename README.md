@@ -15,7 +15,7 @@ Note that not all of this information will be available as low privilege user.
 ## Usage
 
 You have a few options when using the tool
-'''
+```
 ./proc_info -h
 	 -p: Mandatory. Specify the PID you want more information on
 	 -b: Returns basic information about the process
@@ -23,7 +23,7 @@ You have a few options when using the tool
 	 -f: Returns the file descriptors for the process
 	 -m: Returns the memory maps for the process
 	 -a: Runs all of the options above!
-'''
+```
 
 You have to provide a valid PID and at least one option. If you want everything just use -a. Note that -e, -f, -m, and some of the information from -b is dependant on whether you have the relevant permissions to read those proc files.
 
