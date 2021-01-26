@@ -8,16 +8,6 @@
 
 /*
 Linux process listing
-- User parses in a pid they want detailed information on. (Likely from ps or using the process listing tool)
-- Tool then extracts the following information from /proc
-    - Basic process information similar to process listing tool - DONE
-    - Displays the environment variables set for the process - DONE
-    - Displays the memory maps for the process - DONE
-    - Displays the open FDs for the process - DONE
-    - Displays the exe path - DONE
-    - Convert process start time - TO DO
-    - Handle NULL exe path - TO DO
-    - Use bit fields to parse options at cmd line - DONE
 */
 
 void usage()

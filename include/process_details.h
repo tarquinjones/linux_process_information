@@ -1,3 +1,6 @@
+#ifndef PROCESS_DETAILS_H
+#define PROCESS_DETAILS_H
+
 #include <linux/limits.h>
 #define PROC_PTH "/proc/"
 
@@ -28,3 +31,5 @@ typedef struct FD_node
 
 int process_details(const char *pid, u_int8_t options);
 int extract_proc_stat(const char *proc_path, proc_info *procInfo);
+
+#endif
